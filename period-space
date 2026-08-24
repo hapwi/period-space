@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -15,9 +16,10 @@ from pathlib import Path
 INSTALLED = Path("/etc/keyd/period-space.conf")
 SERVICE = "keyd.service"
 SCRIPT = Path(__file__).resolve()
-DEFAULT_RAW = "https://raw.githubusercontent.com/hapwi/period-space/refs/heads/main"
+GITHUB_REPO = "hapwi/period-space"
+DEFAULT_RAW = f"https://raw.githubusercontent.com/{GITHUB_REPO}/refs/heads/main"
 INSTALL_HINT = (
-    'bash -c "$(curl -fsSL https://raw.githubusercontent.com/hapwi/period-space/refs/heads/main/install.sh)"'
+    f'bash -c "$(curl -fsSL https://raw.githubusercontent.com/{GITHUB_REPO}/refs/heads/main/install.sh)"'
 )
 
 
@@ -54,8 +56,31 @@ def source_config() -> Path:
     )
 
 
+def latest_commit_sha() -> str | None:
+    req = urllib.request.Request(
+        f"https://api.github.com/repos/{GITHUB_REPO}/commits/main",
+        headers={
+            "User-Agent": "period-space",
+            "Accept": "application/vnd.github+json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode())
+    except (TimeoutError, json.JSONDecodeError, urllib.error.URLError):
+        return None
+    sha = data.get("sha")
+    return sha if isinstance(sha, str) and sha else None
+
+
 def raw_base() -> str:
-    return os.environ.get("PERIOD_SPACE_RAW", DEFAULT_RAW).rstrip("/")
+    override = os.environ.get("PERIOD_SPACE_RAW")
+    if override:
+        return override.rstrip("/")
+    sha = latest_commit_sha()
+    if sha:
+        return f"https://raw.githubusercontent.com/{GITHUB_REPO}/{sha}"
+    return DEFAULT_RAW
 
 
 def run(argv: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -78,7 +103,7 @@ def sudo(argv: list[str], *, check: bool = True) -> subprocess.CompletedProcess[
         result = subprocess.run(["sudo", *argv], check=False, text=True)
     else:
         result = run(["sudo", "-n", *argv], check=False)
-        if result.returncode != 0:
+        if check and result.returncode != 0:
             raise SystemExit(
                 "sudo needs a password. Run this in a terminal:\n"
                 f"  {INSTALL_HINT}"
@@ -237,9 +262,15 @@ def cmd_update(_: argparse.Namespace) -> None:
         print(f"left your config alone: {user_config()}")
 
     if changed and feature_on():
-        install_config()
-        sudo(["keyd", "reload"], check=False)
-        print("reloaded keyd")
+        try:
+            install_config()
+            sudo(["keyd", "reload"])
+            print("reloaded keyd")
+        except SystemExit as exc:
+            print("CLI is updated. Apply keyd in a terminal with:")
+            print("  period-space reload")
+            if str(exc):
+                print(f"({exc})")
 
 
 def cmd_status(_: argparse.Namespace) -> None:

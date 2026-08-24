@@ -75,15 +75,22 @@ main() {
     exit 1
   fi
 
-  local root cleanup=""
+  local root cleanup="" raw="$RAW"
   root="$(resolve_root)"
   if [[ -z "$root" ]]; then
     root="$(mktemp -d)"
     cleanup="$root"
     trap 'rm -rf "$cleanup"' EXIT
+    local sha=""
+    sha="$(curl -fsSL -H 'User-Agent: period-space' \
+      https://api.github.com/repos/hapwi/period-space/commits/main \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin)["sha"])' 2>/dev/null || true)"
+    if [[ -n "$sha" && -z "${PERIOD_SPACE_RAW:-}" ]]; then
+      raw="https://raw.githubusercontent.com/hapwi/period-space/${sha}"
+    fi
     echo "downloading from GitHub"
-    fetch "$RAW/period-space" "$root/period-space"
-    fetch "$RAW/keyd.conf" "$root/keyd.conf"
+    fetch "$raw/period-space" "$root/period-space"
+    fetch "$raw/keyd.conf" "$root/keyd.conf"
     chmod +x "$root/period-space"
   fi
 
