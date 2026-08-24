@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="340" viewBox="0 0 920 340" role="img" aria-label="Double-space becomes a period in a terminal, editor, and browser">
+  <rect width="920" height="340" fill="#0d1117"/>
+  <g>
+    <rect x="24" y="24" width="280" height="292" rx="12" fill="#161b22" stroke="#30363d"/>
+    <circle cx="48" cy="48" r="5" fill="#ff5f57"/>
+    <circle cx="66" cy="48" r="5" fill="#febc2e"/>
+    <circle cx="84" cy="48" r="5" fill="#28c840"/>
+    <text x="108" y="53" fill="#8b949e" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13">Ghostty</text>
+    <text x="44" y="100" fill="#58a6ff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15">$</text>
+    <text x="62" y="100" fill="#e6edf3" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15">ship it</text>
+    <text x="44" y="128" fill="#e6edf3" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15">ship it.</text>
+    <text x="44" y="300" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12">terminal</text>
+  </g>
+  <g>
+    <rect x="320" y="24" width="280" height="292" rx="12" fill="#161b22" stroke="#30363d"/>
+    <circle cx="344" cy="48" r="5" fill="#ff5f57"/>
+    <circle cx="362" cy="48" r="5" fill="#febc2e"/>
+    <circle cx="380" cy="48" r="5" fill="#28c840"/>
+    <text x="404" y="53" fill="#8b949e" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13">vim</text>
+    <text x="340" y="100" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15">42</text>
+    <text x="372" y="100" fill="#e6edf3" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15">done for now</text>
+    <text x="372" y="128" fill="#e6edf3" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15">done for now.</text>
+    <text x="340" y="300" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12">editor</text>
+  </g>
+  <g>
+    <rect x="616" y="24" width="280" height="292" rx="12" fill="#161b22" stroke="#30363d"/>
+    <circle cx="640" cy="48" r="5" fill="#ff5f57"/>
+    <circle cx="658" cy="48" r="5" fill="#febc2e"/>
+    <circle cx="676" cy="48" r="5" fill="#28c840"/>
+    <text x="700" y="53" fill="#8b949e" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13">Firefox</text>
+    <rect x="636" y="76" width="240" height="28" rx="8" fill="#0d1117"/>
+    <text x="650" y="95" fill="#8b949e" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13">Search or enter address</text>
+    <text x="636" y="140" fill="#e6edf3" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15">thanks for the review</text>
+    <text x="636" y="166" fill="#e6edf3" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15">thanks for the review.</text>
+    <text x="636" y="300" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12">browser</text>
+  </g>
+</svg>
