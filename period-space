@@ -15,9 +15,9 @@ from pathlib import Path
 INSTALLED = Path("/etc/keyd/period-space.conf")
 SERVICE = "keyd.service"
 SCRIPT = Path(__file__).resolve()
-DEFAULT_RAW = "https://raw.githubusercontent.com/hapwi/period-space/main"
+DEFAULT_RAW = "https://raw.githubusercontent.com/hapwi/period-space/refs/heads/main"
 INSTALL_HINT = (
-    'bash -c "$(curl -fsSL https://raw.githubusercontent.com/hapwi/period-space/main/install.sh)"'
+    'bash -c "$(curl -fsSL https://raw.githubusercontent.com/hapwi/period-space/refs/heads/main/install.sh)"'
 )
 
 
