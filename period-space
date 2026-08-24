@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+"""Control the always-on double-space → period remapper (keyd)."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+INSTALLED = Path("/etc/keyd/period-space.conf")
+SERVICE = "keyd.service"
+SCRIPT = Path(__file__).resolve()
+
+
+def xdg_config_home() -> Path:
+    raw = os.environ.get("XDG_CONFIG_HOME")
+    return Path(raw) if raw else Path.home() / ".config"
+
+
+def xdg_data_home() -> Path:
+    raw = os.environ.get("XDG_DATA_HOME")
+    return Path(raw) if raw else Path.home() / ".local" / "share"
+
+
+def user_config() -> Path:
+    return xdg_config_home() / "period-space" / "keyd.conf"
+
+
+def bundled_config() -> Path:
+    return SCRIPT.parent / "keyd.conf"
+
+
+def shared_config() -> Path:
+    return xdg_data_home() / "period-space" / "keyd.conf"
+
+
+def source_config() -> Path:
+    for path in (user_config(), shared_config(), bundled_config()):
+        if path.is_file():
+            return path
+    raise SystemExit(
+        "no keyd.conf found. Clone the repo and run ./install.sh, "
+        f"or copy keyd.conf to {user_config()}"
+    )
+
+
+def run(argv: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(argv, check=check, text=True, capture_output=True)
+
+
+def sudo(argv: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    return run(["sudo", *argv], check=check)
+
+
+def installed_matches() -> bool:
+    return INSTALLED.is_file() and INSTALLED.read_text() == source_config().read_text()
+
+
+def keyd_active() -> bool:
+    return run(["systemctl", "is-active", "--quiet", SERVICE], check=False).returncode == 0
+
+
+def keyd_enabled() -> bool:
+    return run(["systemctl", "is-enabled", "--quiet", SERVICE], check=False).returncode == 0
+
+
+def feature_on() -> bool:
+    return INSTALLED.is_file() and keyd_active()
+
+
+def ensure_user_config() -> Path:
+    dest = user_config()
+    if dest.is_file():
+        return dest
+    src = source_config()
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(src.read_text())
+    return dest
+
+
+def install_config() -> None:
+    src = ensure_user_config()
+    sudo(["install", "-d", "-m", "0755", "/etc/keyd"])
+    sudo(["install", "-m", "0644", str(src), str(INSTALLED)])
+    check = sudo(["keyd", "check", str(INSTALLED)], check=False)
+    if check.returncode != 0:
+        sudo(["rm", "-f", str(INSTALLED)], check=False)
+        sys.stderr.write(check.stdout)
+        sys.stderr.write(check.stderr)
+        raise SystemExit("keyd rejected the config; nothing was left installed")
+
+
+def cmd_on(_: argparse.Namespace) -> None:
+    if shutil.which("keyd") is None:
+        raise SystemExit("keyd is not installed. See the README for distro instructions.")
+    install_config()
+    sudo(["systemctl", "enable", "--now", SERVICE])
+    sudo(["keyd", "reload"], check=False)
+    print("double-space → period is on (keyd is running)")
+
+
+def cmd_off(_: argparse.Namespace) -> None:
+    if INSTALLED.exists():
+        sudo(["rm", "-f", str(INSTALLED)])
+    if keyd_active():
+        sudo(["keyd", "reload"], check=False)
+    print("double-space → period is off (keyd stays installed, mapping removed)")
+
+
+def cmd_reload(_: argparse.Namespace) -> None:
+    install_config()
+    sudo(["keyd", "reload"])
+    print("reloaded keyd with the current period-space config")
+
+
+def cmd_install(_: argparse.Namespace) -> None:
+    bindir = Path.home() / ".local" / "bin"
+    bindir.mkdir(parents=True, exist_ok=True)
+    target = bindir / "period-space"
+    shutil.copy2(SCRIPT, target)
+    target.chmod(0o755)
+
+    share = shared_config()
+    share.parent.mkdir(parents=True, exist_ok=True)
+    if bundled_config().is_file():
+        shutil.copy2(bundled_config(), share)
+
+    if not user_config().is_file():
+        ensure_user_config()
+
+    print(f"installed {target}")
+    print(f"default config: {share}")
+    print(f"your config:    {user_config()}")
+    if str(bindir) not in os.environ.get("PATH", "").split(":"):
+        print(f"add {bindir} to PATH if `period-space` is not found")
+
+
+def cmd_status(_: argparse.Namespace) -> None:
+    src = None
+    try:
+        src = source_config()
+    except SystemExit:
+        pass
+    print(f"config source:  {src if src else 'missing'}")
+    print(f"user config:    {user_config()} ({'yes' if user_config().is_file() else 'no'})")
+    print(f"installed:      {INSTALLED} ({'yes' if INSTALLED.is_file() else 'no'})")
+    print(f"matches source: {'yes' if INSTALLED.is_file() and src and installed_matches() else 'no'}")
+    print(f"keyd service:   {'active' if keyd_active() else 'inactive'}, "
+          f"{'enabled' if keyd_enabled() else 'disabled'}")
+    print(f"feature:        {'on' if feature_on() else 'off'}")
+    if shutil.which("keyd") is None:
+        print("keyd binary:    missing")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="macOS-style period on double-space. keyd remaps at the device level so it works in terminals."
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("on", help="install the mapping and start keyd").set_defaults(func=cmd_on)
+    sub.add_parser("off", help="remove the mapping").set_defaults(func=cmd_off)
+    sub.add_parser("reload", help="copy the config and reload keyd").set_defaults(func=cmd_reload)
+    sub.add_parser("install", help="copy the CLI into ~/.local/bin").set_defaults(func=cmd_install)
+    sub.add_parser("status", help="show whether the mapping is active").set_defaults(func=cmd_status)
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()
