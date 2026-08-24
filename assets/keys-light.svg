@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="88" viewBox="0 0 560 88" role="img" aria-label="Two spaces become a period and a space">
+  <rect x="8" y="18" width="132" height="52" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="74" y="50" text-anchor="middle" fill="#1f2328" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="600">space</text>
+  <rect x="148" y="18" width="132" height="52" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="214" y="50" text-anchor="middle" fill="#1f2328" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="600">space</text>
+  <path d="M300 44h36" stroke="#656d76" stroke-width="2" stroke-linecap="round"/>
+  <path d="M328 36l12 8-12 8" fill="none" stroke="#656d76" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="360" y="18" width="52" height="52" rx="10" fill="#111111"/>
+  <circle cx="386" cy="52" r="5" fill="#ffffff"/>
+  <rect x="420" y="18" width="132" height="52" rx="10" fill="#111111"/>
+  <text x="486" y="50" text-anchor="middle" fill="#ffffff" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="600">space</text>
+</svg>

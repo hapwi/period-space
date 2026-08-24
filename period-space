@@ -8,11 +8,17 @@ import os
 import shutil
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 INSTALLED = Path("/etc/keyd/period-space.conf")
 SERVICE = "keyd.service"
 SCRIPT = Path(__file__).resolve()
+DEFAULT_RAW = "https://raw.githubusercontent.com/hapwi/period-space/main"
+INSTALL_HINT = (
+    'bash -c "$(curl -fsSL https://raw.githubusercontent.com/hapwi/period-space/main/install.sh)"'
+)
 
 
 def xdg_config_home() -> Path:
@@ -42,9 +48,14 @@ def source_config() -> Path:
         if path.is_file():
             return path
     raise SystemExit(
-        "no keyd.conf found. Clone the repo and run ./install.sh, "
+        "no keyd.conf found. Install with:\n"
+        f"  {INSTALL_HINT}\n"
         f"or copy keyd.conf to {user_config()}"
     )
+
+
+def raw_base() -> str:
+    return os.environ.get("PERIOD_SPACE_RAW", DEFAULT_RAW).rstrip("/")
 
 
 def run(argv: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -52,18 +63,48 @@ def run(argv: list[str], *, check: bool = True) -> subprocess.CompletedProcess[s
 
 
 def sudo(argv: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
-    if sys.stdin.isatty():
+    tty = Path("/dev/tty")
+    stdin = None
+    try:
+        stdin = tty.open()
+    except OSError:
+        pass
+    if stdin is not None:
+        try:
+            result = subprocess.run(["sudo", *argv], check=False, text=True, stdin=stdin)
+        finally:
+            stdin.close()
+    elif sys.stdin.isatty():
         result = subprocess.run(["sudo", *argv], check=False, text=True)
     else:
         result = run(["sudo", "-n", *argv], check=False)
         if result.returncode != 0:
             raise SystemExit(
                 "sudo needs a password. Run this in a terminal:\n"
-                "  cd ~/github/period-space && ./install.sh"
+                f"  {INSTALL_HINT}"
             )
     if check and result.returncode != 0:
         raise SystemExit(result.stderr or f"command failed: sudo {' '.join(argv)}")
     return result
+
+
+def http_get(url: str) -> bytes:
+    req = urllib.request.Request(url, headers={"User-Agent": "period-space"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.read()
+    except urllib.error.HTTPError as exc:
+        raise SystemExit(f"download failed: {exc.code} {url}") from exc
+    except urllib.error.URLError as exc:
+        raise SystemExit(f"download failed: {exc.reason} ({url})") from exc
+
+
+def atomic_write(path: Path, data: bytes, mode: int = 0o644) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_bytes(data)
+    tmp.chmod(mode)
+    tmp.replace(path)
 
 
 def installed_matches() -> bool:
@@ -106,7 +147,10 @@ def install_config() -> None:
 
 def cmd_on(_: argparse.Namespace) -> None:
     if shutil.which("keyd") is None:
-        raise SystemExit("keyd is not installed. See the README for distro instructions.")
+        raise SystemExit(
+            "keyd is not installed. On Fedora/Arch the installer can do this for you:\n"
+            f"  {INSTALL_HINT}"
+        )
     install_config()
     sudo(["systemctl", "enable", "--now", SERVICE])
     sudo(["keyd", "reload"], check=False)
@@ -151,6 +195,53 @@ def cmd_install(args: argparse.Namespace) -> None:
         cmd_on(args)
 
 
+def cmd_update(_: argparse.Namespace) -> None:
+    base = raw_base()
+    script_bytes = http_get(f"{base}/period-space")
+    conf_bytes = http_get(f"{base}/keyd.conf")
+    try:
+        script_text = script_bytes.decode("utf-8")
+        conf_text = conf_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise SystemExit("downloaded files were not valid text") from exc
+
+    if not script_text.startswith("#!/usr/bin/env python3") or "def cmd_update" not in script_text:
+        raise SystemExit(
+            "downloaded period-space looks invalid or too old.\n"
+            "GitHub may still be serving the previous CLI. From a clone:\n"
+            "  python3 period-space install"
+        )
+    if "[afterspace]" not in conf_text or "oneshot_timeout" not in conf_text:
+        raise SystemExit("downloaded keyd.conf looks invalid")
+
+    bindir = Path.home() / ".local" / "bin"
+    target = bindir / "period-space"
+    share = shared_config()
+    changed = False
+
+    if not target.is_file() or target.read_bytes() != script_bytes:
+        atomic_write(target, script_bytes, 0o755)
+        print(f"updated {target}")
+        changed = True
+    if not share.is_file() or share.read_bytes() != conf_bytes:
+        atomic_write(share, conf_bytes, 0o644)
+        print(f"updated {share}")
+        changed = True
+
+    if not changed:
+        print("already up to date")
+    elif str(bindir) not in os.environ.get("PATH", "").split(":"):
+        print(f"add {bindir} to PATH if `period-space` is not found")
+
+    if user_config().is_file():
+        print(f"left your config alone: {user_config()}")
+
+    if changed and feature_on():
+        install_config()
+        sudo(["keyd", "reload"], check=False)
+        print("reloaded keyd")
+
+
 def cmd_status(_: argparse.Namespace) -> None:
     src = None
     try:
@@ -183,6 +274,10 @@ def main() -> None:
         help="also install the keyd mapping and start the service",
     )
     install.set_defaults(func=cmd_install)
+    sub.add_parser(
+        "update",
+        help="download the latest CLI and bundled config from GitHub",
+    ).set_defaults(func=cmd_update)
     sub.add_parser("status", help="show whether the mapping is active").set_defaults(func=cmd_status)
     args = parser.parse_args()
     args.func(args)

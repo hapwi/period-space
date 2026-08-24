@@ -6,14 +6,22 @@
 </p>
 
 <p align="center">
-  <b>macOS-style double-space → period, on Linux.</b><br>
-  Works everywhere the keyboard works — terminals, TTY, Wayland, X11, editors, browsers.
+  <b>Double-space → period. On Linux. Everywhere.</b>
 </p>
 
 <p align="center">
-  <a href="#installation">Installation</a>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/keys-dark.svg">
+    <img src="assets/keys-light.svg" alt="space, space, then a period and a space" width="480">
+  </picture>
+</p>
+
+<p align="center">
+  <a href="#install">Install</a>
   ·
-  <a href="#usage">Usage</a>
+  <a href="#update">Update</a>
+  ·
+  <a href="#commands">Commands</a>
   ·
   <a href="#configuration">Configuration</a>
   ·
@@ -38,14 +46,22 @@ Same habit as iOS and macOS: tap Space twice quickly after a word and you get a 
 
 This is not a GNOME extension, a terminal setting, or an editor plugin. **period-space** remaps the key at the device level with [keyd](https://github.com/rvaiya/keyd), so every program sees the finished `. `.
 
-## Features
+Ghostty, vim, Firefox, niri, GNOME, KDE, a raw TTY — if you can type there, it works there. Ctrl / Alt / Super + Space are left alone.
 
-- **Works everywhere** — Ghostty, vim, Firefox, niri, GNOME, KDE, a raw TTY. If you can type there, it works there.
-- **macOS-identical** — first Space is a Space; a second Space within 400ms becomes `. `.
-- **Stays out of shortcuts** — Ctrl / Alt / Super + Space are left alone.
-- **On at boot** — `./install.sh` enables the keyd service so it survives reboot.
+## Install
 
-## Installation
+No fork. No clone. One command:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/hapwi/period-space/main/install.sh)"
+```
+
+It downloads the CLI, writes a user config if you do not have one, installs [keyd](https://github.com/rvaiya/keyd) on Fedora or Arch if needed, and turns the mapping on. It asks for `sudo` once so keyd can own the keyboard.
+
+Python 3 and sudo are required. After it finishes, `~/.local/bin` needs to be on your `PATH`.
+
+<details>
+<summary>From a local clone</summary>
 
 ```bash
 git clone https://github.com/hapwi/period-space.git
@@ -53,16 +69,32 @@ cd period-space
 ./install.sh
 ```
 
-The installer copies `period-space` to `~/.local/bin`, writes a user config if you do not have one, installs keyd on Fedora or Arch if needed, and turns the mapping on. It asks for `sudo` once so keyd can own the keyboard.
+</details>
 
-## Usage
+<details>
+<summary>Other distros</summary>
+
+Install [keyd](https://github.com/rvaiya/keyd) yourself, then rerun the curl command. The installer will skip the package step and only set up period-space.
+
+</details>
+
+## Update
 
 ```bash
-period-space on        # enable
-period-space off       # disable
-period-space status    # is it active?
-period-space reload    # apply config edits
+period-space update
 ```
+
+Pulls the latest CLI and bundled defaults from GitHub. Your `~/.config/period-space/keyd.conf` is never overwritten. If the mapping is on, keyd is reloaded.
+
+## Commands
+
+| Command | What it does |
+| --- | --- |
+| `period-space on` | enable the mapping |
+| `period-space off` | disable it (keyd stays installed) |
+| `period-space status` | is it active? |
+| `period-space reload` | apply config edits |
+| `period-space update` | fetch the latest from GitHub |
 
 Type a word, tap Space twice. You should get `word. `.
 
@@ -100,6 +132,15 @@ keyd monitor
 3. That consumes the layer. A third Space is just another Space.
 
 Because this happens on the input device, the compositor, the terminal, and the TTY all see the same `. `.
+
+## Uninstall
+
+```bash
+period-space off
+rm -f ~/.local/bin/period-space
+```
+
+keyd is left in place in case you use it for anything else.
 
 ## License
 
