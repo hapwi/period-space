@@ -53,7 +53,7 @@ Ghostty, vim, Firefox, niri, GNOME, KDE, a raw TTY — if you can type there, it
 No fork. No clone. One command:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/hapwi/period-space/refs/heads/main/install.sh)"
+curl -fsSL https://raw.githubusercontent.com/hapwi/period-space/refs/heads/main/install.sh | bash
 ```
 
 It downloads the CLI, writes a user config if you do not have one, installs [keyd](https://github.com/rvaiya/keyd) on Fedora or Arch if needed, and turns the mapping on. It asks for `sudo` once so keyd can own the keyboard.

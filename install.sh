@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install period-space without cloning:
-#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/hapwi/period-space/refs/heads/main/install.sh)"
+#   curl -fsSL https://raw.githubusercontent.com/hapwi/period-space/refs/heads/main/install.sh | bash
 set -euo pipefail
 
 RAW="${PERIOD_SPACE_RAW:-https://raw.githubusercontent.com/hapwi/period-space/refs/heads/main}"

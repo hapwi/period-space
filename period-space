@@ -19,7 +19,7 @@ SCRIPT = Path(__file__).resolve()
 GITHUB_REPO = "hapwi/period-space"
 DEFAULT_RAW = f"https://raw.githubusercontent.com/{GITHUB_REPO}/refs/heads/main"
 INSTALL_HINT = (
-    f'bash -c "$(curl -fsSL https://raw.githubusercontent.com/{GITHUB_REPO}/refs/heads/main/install.sh)"'
+    f"curl -fsSL https://raw.githubusercontent.com/{GITHUB_REPO}/refs/heads/main/install.sh | bash"
 )
 
 
