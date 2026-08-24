@@ -8,29 +8,23 @@ Type `hello` then tap Space twice quickly. You get `hello. `.
 
 ## Install
 
+This is its own repo. On this machine it lives at `~/github/period-space`.
+
+From a checkout:
+
 ```bash
-git clone https://github.com/hapwi/period-space.git
-cd period-space
+cd ~/github/period-space
 ./install.sh
 ```
 
-Install keyd if you do not already have it:
+That copies `period-space` to `~/.local/bin`, writes your config if it is missing, installs [keyd](https://github.com/rvaiya/keyd) on Fedora or Arch if needed, and turns the mapping on.
+
+From GitHub on another machine:
 
 ```bash
-# Fedora
-sudo dnf copr enable alternateved/keyd
-sudo dnf install keyd
-
-# Arch
-sudo pacman -S keyd
-```
-
-Other distros: see [keyd](https://github.com/rvaiya/keyd).
-
-Then turn the mapping on (starts keyd and keeps it enabled across reboots):
-
-```bash
-period-space on
+git clone https://github.com/hapwi/period-space.git ~/github/period-space
+cd ~/github/period-space
+./install.sh
 ```
 
 ## Use

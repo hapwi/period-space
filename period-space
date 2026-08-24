@@ -52,7 +52,18 @@ def run(argv: list[str], *, check: bool = True) -> subprocess.CompletedProcess[s
 
 
 def sudo(argv: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
-    return run(["sudo", *argv], check=check)
+    if sys.stdin.isatty():
+        result = subprocess.run(["sudo", *argv], check=False, text=True)
+    else:
+        result = run(["sudo", "-n", *argv], check=False)
+        if result.returncode != 0:
+            raise SystemExit(
+                "sudo needs a password. Run this in a terminal:\n"
+                "  cd ~/github/period-space && ./install.sh"
+            )
+    if check and result.returncode != 0:
+        raise SystemExit(result.stderr or f"command failed: sudo {' '.join(argv)}")
+    return result
 
 
 def installed_matches() -> bool:
@@ -116,7 +127,7 @@ def cmd_reload(_: argparse.Namespace) -> None:
     print("reloaded keyd with the current period-space config")
 
 
-def cmd_install(_: argparse.Namespace) -> None:
+def cmd_install(args: argparse.Namespace) -> None:
     bindir = Path.home() / ".local" / "bin"
     bindir.mkdir(parents=True, exist_ok=True)
     target = bindir / "period-space"
@@ -136,6 +147,8 @@ def cmd_install(_: argparse.Namespace) -> None:
     print(f"your config:    {user_config()}")
     if str(bindir) not in os.environ.get("PATH", "").split(":"):
         print(f"add {bindir} to PATH if `period-space` is not found")
+    if args.enable:
+        cmd_on(args)
 
 
 def cmd_status(_: argparse.Namespace) -> None:
@@ -163,7 +176,13 @@ def main() -> None:
     sub.add_parser("on", help="install the mapping and start keyd").set_defaults(func=cmd_on)
     sub.add_parser("off", help="remove the mapping").set_defaults(func=cmd_off)
     sub.add_parser("reload", help="copy the config and reload keyd").set_defaults(func=cmd_reload)
-    sub.add_parser("install", help="copy the CLI into ~/.local/bin").set_defaults(func=cmd_install)
+    install = sub.add_parser("install", help="copy the CLI into ~/.local/bin")
+    install.add_argument(
+        "--enable",
+        action="store_true",
+        help="also install the keyd mapping and start the service",
+    )
+    install.set_defaults(func=cmd_install)
     sub.add_parser("status", help="show whether the mapping is active").set_defaults(func=cmd_status)
     args = parser.parse_args()
     args.func(args)
