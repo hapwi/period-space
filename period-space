@@ -9,17 +9,20 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path
 
 INSTALLED = Path("/etc/keyd/period-space.conf")
+CLI_TARGET = Path("/usr/local/bin/period-space")
+DEFAULT_CONFIG = Path("/usr/local/share/period-space/keyd.conf")
 SERVICE = "keyd.service"
 SCRIPT = Path(__file__).resolve()
 GITHUB_REPO = "hapwi/period-space"
 DEFAULT_RAW = f"https://raw.githubusercontent.com/{GITHUB_REPO}/refs/heads/main"
 INSTALL_HINT = (
-    f"curl -fsSL https://raw.githubusercontent.com/{GITHUB_REPO}/refs/heads/main/install.sh | bash"
+    "curl -fsSL https://hapwi.github.io/install/period-space.sh | bash"
 )
 
 
@@ -45,8 +48,12 @@ def shared_config() -> Path:
     return xdg_data_home() / "period-space" / "keyd.conf"
 
 
+def legacy_cli() -> Path:
+    return Path.home() / ".local" / "bin" / "period-space"
+
+
 def source_config() -> Path:
-    for path in (user_config(), shared_config(), bundled_config()):
+    for path in (user_config(), DEFAULT_CONFIG, shared_config(), bundled_config()):
         if path.is_file():
             return path
     raise SystemExit(
@@ -124,12 +131,29 @@ def http_get(url: str) -> bytes:
         raise SystemExit(f"download failed: {exc.reason} ({url})") from exc
 
 
-def atomic_write(path: Path, data: bytes, mode: int = 0o644) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_bytes(data)
-    tmp.chmod(mode)
-    tmp.replace(path)
+def sudo_install_bytes(data: bytes, target: Path, mode: int) -> None:
+    with tempfile.TemporaryDirectory(prefix="period-space-") as directory:
+        source = Path(directory) / target.name
+        source.write_bytes(data)
+        source.chmod(mode)
+        sudo(["install", "-d", "-m", "0755", str(target.parent)])
+        sudo(["install", "-m", f"{mode:04o}", str(source), str(target)])
+
+
+def remove_legacy_cli() -> None:
+    path = legacy_cli()
+    if not path.is_file() or path == CLI_TARGET:
+        return
+    try:
+        contents = path.read_text()
+    except (OSError, UnicodeDecodeError):
+        return
+    if 'GITHUB_REPO = "hapwi/period-space"' in contents:
+        try:
+            path.unlink()
+        except OSError:
+            return
+        print(f"removed old user-local CLI: {path}")
 
 
 def installed_matches() -> bool:
@@ -173,7 +197,7 @@ def install_config() -> None:
 def cmd_on(_: argparse.Namespace) -> None:
     if shutil.which("keyd") is None:
         raise SystemExit(
-            "keyd is not installed. On Fedora/Arch the installer can do this for you:\n"
+            "keyd is not installed. The installer can set it up on the major distros:\n"
             f"  {INSTALL_HINT}"
         )
     install_config()
@@ -197,25 +221,20 @@ def cmd_reload(_: argparse.Namespace) -> None:
 
 
 def cmd_install(args: argparse.Namespace) -> None:
-    bindir = Path.home() / ".local" / "bin"
-    bindir.mkdir(parents=True, exist_ok=True)
-    target = bindir / "period-space"
-    shutil.copy2(SCRIPT, target)
-    target.chmod(0o755)
-
-    share = shared_config()
-    share.parent.mkdir(parents=True, exist_ok=True)
+    if SCRIPT != CLI_TARGET:
+        sudo(["install", "-d", "-m", "0755", str(CLI_TARGET.parent)])
+        sudo(["install", "-m", "0755", str(SCRIPT), str(CLI_TARGET)])
     if bundled_config().is_file():
-        shutil.copy2(bundled_config(), share)
+        sudo(["install", "-d", "-m", "0755", str(DEFAULT_CONFIG.parent)])
+        sudo(["install", "-m", "0644", str(bundled_config()), str(DEFAULT_CONFIG)])
 
     if not user_config().is_file():
         ensure_user_config()
 
-    print(f"installed {target}")
-    print(f"default config: {share}")
+    print(f"installed {CLI_TARGET}")
+    print(f"default config: {DEFAULT_CONFIG}")
     print(f"your config:    {user_config()}")
-    if str(bindir) not in os.environ.get("PATH", "").split(":"):
-        print(f"add {bindir} to PATH if `period-space` is not found")
+    remove_legacy_cli()
     if args.enable:
         cmd_on(args)
 
@@ -239,27 +258,23 @@ def cmd_update(_: argparse.Namespace) -> None:
     if "[afterspace]" not in conf_text or "oneshot_timeout" not in conf_text:
         raise SystemExit("downloaded keyd.conf looks invalid")
 
-    bindir = Path.home() / ".local" / "bin"
-    target = bindir / "period-space"
-    share = shared_config()
     changed = False
 
-    if not target.is_file() or target.read_bytes() != script_bytes:
-        atomic_write(target, script_bytes, 0o755)
-        print(f"updated {target}")
+    if not CLI_TARGET.is_file() or CLI_TARGET.read_bytes() != script_bytes:
+        sudo_install_bytes(script_bytes, CLI_TARGET, 0o755)
+        print(f"updated {CLI_TARGET}")
         changed = True
-    if not share.is_file() or share.read_bytes() != conf_bytes:
-        atomic_write(share, conf_bytes, 0o644)
-        print(f"updated {share}")
+    if not DEFAULT_CONFIG.is_file() or DEFAULT_CONFIG.read_bytes() != conf_bytes:
+        sudo_install_bytes(conf_bytes, DEFAULT_CONFIG, 0o644)
+        print(f"updated {DEFAULT_CONFIG}")
         changed = True
 
     if not changed:
         print("already up to date")
-    elif str(bindir) not in os.environ.get("PATH", "").split(":"):
-        print(f"add {bindir} to PATH if `period-space` is not found")
 
     if user_config().is_file():
         print(f"left your config alone: {user_config()}")
+    remove_legacy_cli()
 
     if changed and feature_on():
         try:
@@ -298,7 +313,7 @@ def main() -> None:
     sub.add_parser("on", help="install the mapping and start keyd").set_defaults(func=cmd_on)
     sub.add_parser("off", help="remove the mapping").set_defaults(func=cmd_off)
     sub.add_parser("reload", help="copy the config and reload keyd").set_defaults(func=cmd_reload)
-    install = sub.add_parser("install", help="copy the CLI into ~/.local/bin")
+    install = sub.add_parser("install", help="install the CLI system-wide")
     install.add_argument(
         "--enable",
         action="store_true",
