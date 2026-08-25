@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import hmac
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -20,7 +23,8 @@ DEFAULT_CONFIG = Path("/usr/local/share/period-space/keyd.conf")
 SERVICE = "keyd.service"
 SCRIPT = Path(__file__).resolve()
 GITHUB_REPO = "hapwi/period-space"
-DEFAULT_RAW = f"https://raw.githubusercontent.com/{GITHUB_REPO}/refs/heads/main"
+VERSION = "1.0.0"
+LATEST_RELEASE_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 INSTALL_HINT = (
     "curl -fsSL https://hapwi.github.io/install/period-space.sh | bash"
 )
@@ -63,33 +67,6 @@ def source_config() -> Path:
     )
 
 
-def latest_commit_sha() -> str | None:
-    req = urllib.request.Request(
-        f"https://api.github.com/repos/{GITHUB_REPO}/commits/main",
-        headers={
-            "User-Agent": "period-space",
-            "Accept": "application/vnd.github+json",
-        },
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read().decode())
-    except (TimeoutError, json.JSONDecodeError, urllib.error.URLError):
-        return None
-    sha = data.get("sha")
-    return sha if isinstance(sha, str) and sha else None
-
-
-def raw_base() -> str:
-    override = os.environ.get("PERIOD_SPACE_RAW")
-    if override:
-        return override.rstrip("/")
-    sha = latest_commit_sha()
-    if sha:
-        return f"https://raw.githubusercontent.com/{GITHUB_REPO}/{sha}"
-    return DEFAULT_RAW
-
-
 def run(argv: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
     return subprocess.run(argv, check=check, text=True, capture_output=True)
 
@@ -121,7 +98,13 @@ def sudo(argv: list[str], *, check: bool = True) -> subprocess.CompletedProcess[
 
 
 def http_get(url: str) -> bytes:
-    req = urllib.request.Request(url, headers={"User-Agent": "period-space"})
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": f"period-space/{VERSION}",
+            "Accept": "application/vnd.github+json",
+        },
+    )
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return resp.read()
@@ -129,6 +112,60 @@ def http_get(url: str) -> bytes:
         raise SystemExit(f"download failed: {exc.code} {url}") from exc
     except urllib.error.URLError as exc:
         raise SystemExit(f"download failed: {exc.reason} ({url})") from exc
+
+
+def parse_version(value: str) -> tuple[int, int, int]:
+    match = re.fullmatch(r"v?(\d+)\.(\d+)\.(\d+)", value)
+    if match is None:
+        raise SystemExit(f"invalid release version: {value}")
+    major, minor, patch = match.groups()
+    return int(major), int(minor), int(patch)
+
+
+def latest_release_tag() -> str:
+    try:
+        data: object = json.loads(http_get(LATEST_RELEASE_API))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SystemExit("GitHub returned invalid release metadata") from exc
+    if not isinstance(data, dict):
+        raise SystemExit("GitHub returned invalid release metadata")
+    tag = data.get("tag_name")
+    if not isinstance(tag, str):
+        raise SystemExit("latest GitHub release has no version tag")
+    parse_version(tag)
+    return tag
+
+
+def release_base(tag: str) -> str:
+    return f"https://github.com/{GITHUB_REPO}/releases/download/{tag}"
+
+
+def verify_release_file(name: str, data: bytes, checksums: bytes) -> None:
+    try:
+        lines = checksums.decode("utf-8").splitlines()
+    except UnicodeDecodeError as exc:
+        raise SystemExit("release checksums are not valid text") from exc
+    expected = None
+    for line in lines:
+        parts = line.split(maxsplit=1)
+        if len(parts) == 2 and parts[1].lstrip("*") == name:
+            expected = parts[0]
+            break
+    if expected is None:
+        raise SystemExit(f"release checksum is missing for {name}")
+    actual = hashlib.sha256(data).hexdigest()
+    if not hmac.compare_digest(actual, expected):
+        raise SystemExit(f"release checksum failed for {name}")
+
+
+def confirm_update(version: str, assume_yes: bool) -> bool:
+    if assume_yes:
+        return True
+    if not sys.stdin.isatty():
+        print(f"Run `period-space update --yes` to install {version} noninteractively.")
+        return False
+    answer = input(f"Install period-space {version}? [y/N] ").strip().lower()
+    return answer in {"y", "yes"}
 
 
 def sudo_install_bytes(data: bytes, target: Path, mode: int) -> None:
@@ -239,44 +276,53 @@ def cmd_install(args: argparse.Namespace) -> None:
         cmd_on(args)
 
 
-def cmd_update(_: argparse.Namespace) -> None:
-    base = raw_base()
+def cmd_update(args: argparse.Namespace) -> None:
+    tag = latest_release_tag()
+    current_version = parse_version(VERSION)
+    available_version = parse_version(tag)
+    latest = tag.removeprefix("v")
+
+    print(f"current version: {VERSION}")
+    print(f"latest version:  {latest}")
+    if available_version == current_version:
+        print("period-space is already up to date")
+        return
+    if available_version < current_version:
+        print("this build is newer than the latest release")
+        return
+    if not confirm_update(latest, args.yes):
+        print("update cancelled")
+        return
+
+    base = release_base(tag)
+    print(f"downloading period-space {latest}")
+    checksums = http_get(f"{base}/SHA256SUMS")
     script_bytes = http_get(f"{base}/period-space")
     conf_bytes = http_get(f"{base}/keyd.conf")
+    verify_release_file("period-space", script_bytes, checksums)
+    verify_release_file("keyd.conf", conf_bytes, checksums)
     try:
         script_text = script_bytes.decode("utf-8")
         conf_text = conf_bytes.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise SystemExit("downloaded files were not valid text") from exc
 
-    if not script_text.startswith("#!/usr/bin/env python3") or "def cmd_update" not in script_text:
-        raise SystemExit(
-            "downloaded period-space looks invalid or too old.\n"
-            "GitHub may still be serving the previous CLI. From a clone:\n"
-            "  python3 period-space install"
-        )
+    if (
+        not script_text.startswith("#!/usr/bin/env python3")
+        or f'VERSION = "{latest}"' not in script_text
+    ):
+        raise SystemExit("downloaded CLI does not match the release version")
     if "[afterspace]" not in conf_text or "oneshot_timeout" not in conf_text:
         raise SystemExit("downloaded keyd.conf looks invalid")
 
-    changed = False
-
-    if not CLI_TARGET.is_file() or CLI_TARGET.read_bytes() != script_bytes:
-        sudo_install_bytes(script_bytes, CLI_TARGET, 0o755)
-        print(f"updated {CLI_TARGET}")
-        changed = True
-    if not DEFAULT_CONFIG.is_file() or DEFAULT_CONFIG.read_bytes() != conf_bytes:
-        sudo_install_bytes(conf_bytes, DEFAULT_CONFIG, 0o644)
-        print(f"updated {DEFAULT_CONFIG}")
-        changed = True
-
-    if not changed:
-        print("already up to date")
-
+    sudo_install_bytes(script_bytes, CLI_TARGET, 0o755)
+    sudo_install_bytes(conf_bytes, DEFAULT_CONFIG, 0o644)
+    print(f"updated period-space {VERSION} → {latest}")
     if user_config().is_file():
         print(f"left your config alone: {user_config()}")
     remove_legacy_cli()
 
-    if changed and feature_on():
+    if feature_on():
         try:
             install_config()
             sudo(["keyd", "reload"])
@@ -294,6 +340,7 @@ def cmd_status(_: argparse.Namespace) -> None:
         src = source_config()
     except SystemExit:
         pass
+    print(f"version:        {VERSION}")
     print(f"config source:  {src if src else 'missing'}")
     print(f"user config:    {user_config()} ({'yes' if user_config().is_file() else 'no'})")
     print(f"installed:      {INSTALLED} ({'yes' if INSTALLED.is_file() else 'no'})")
@@ -309,6 +356,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="macOS-style period on double-space. keyd remaps at the device level so it works in terminals."
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("on", help="install the mapping and start keyd").set_defaults(func=cmd_on)
     sub.add_parser("off", help="remove the mapping").set_defaults(func=cmd_off)
@@ -320,10 +368,17 @@ def main() -> None:
         help="also install the keyd mapping and start the service",
     )
     install.set_defaults(func=cmd_install)
-    sub.add_parser(
+    update = sub.add_parser(
         "update",
-        help="download the latest CLI and bundled config from GitHub",
-    ).set_defaults(func=cmd_update)
+        help="check for and install a newer GitHub release",
+    )
+    update.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="install without asking for confirmation",
+    )
+    update.set_defaults(func=cmd_update)
     sub.add_parser("status", help="show whether the mapping is active").set_defaults(func=cmd_status)
     args = parser.parse_args()
     args.func(args)

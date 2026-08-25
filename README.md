@@ -39,7 +39,7 @@ One command. No clone required.
 curl -fsSL https://hapwi.github.io/install/period-space.sh | bash
 ```
 
-The installer downloads the CLI to `/usr/local/bin`, creates your user config, installs keyd when needed, and enables the shortcut. It requests `sudo` once for the system-wide command and keyboard access.
+The installer downloads the latest stable GitHub Release to `/usr/local/bin`, verifies its checksum, creates your user config, installs keyd when needed, and enables the shortcut. It requests `sudo` once for the system-wide command and keyboard access.
 
 > [!NOTE]
 > Requires Linux with Python 3, sudo, and systemd.
@@ -92,7 +92,8 @@ The keyboard event is transformed before it reaches your compositor or applicati
 | `period-space off` | Remove the mapping while keeping keyd installed |
 | `period-space status` | Show the config, service, and feature status |
 | `period-space reload` | Apply changes from your user config |
-| `period-space update` | Download the latest CLI and bundled defaults |
+| `period-space update` | Check for a newer release and ask before installing it |
+| `period-space --version` | Print the installed version |
 
 Try it after installation: type a word, then tap Space twice. You should get `word. `.
 
@@ -102,7 +103,27 @@ Try it after installation: type a word, then tap Space twice. You should get `wo
 period-space update
 ```
 
-Updates the CLI and bundled defaults from GitHub. Your personal config at `~/.config/period-space/keyd.conf` is never overwritten. If the shortcut is active, keyd reloads automatically.
+The updater reports your installed version and the latest stable release. When a newer version exists, it asks before downloading and verifying the release:
+
+```text
+current version: 1.0.0
+latest version:  1.0.1
+Install period-space 1.0.1? [y/N]
+```
+
+For scripts and unattended upgrades, use `period-space update --yes`. Your personal config at `~/.config/period-space/keyd.conf` is never overwritten.
+
+<details>
+<summary><strong>Publishing a release</strong></summary>
+
+1. Update `VERSION` in the `period-space` CLI.
+2. Commit the release changes.
+3. Tag that commit with the matching version, such as `v1.0.1`.
+4. Push the tag to GitHub.
+
+The release workflow validates the version, generates SHA-256 checksums, and publishes the CLI, config, and installer as GitHub Release assets.
+
+</details>
 
 ## Configuration
 

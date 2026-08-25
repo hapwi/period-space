@@ -3,7 +3,8 @@
 #   curl -fsSL https://hapwi.github.io/install/period-space.sh | bash
 set -euo pipefail
 
-RAW="${PERIOD_SPACE_RAW:-https://raw.githubusercontent.com/hapwi/period-space/refs/heads/main}"
+MAIN_RAW="https://raw.githubusercontent.com/hapwi/period-space/refs/heads/main"
+PERIOD_SPACE_RELEASES="https://api.github.com/repos/hapwi/period-space/releases/latest"
 KEYD_RELEASES="https://api.github.com/repos/rvaiya/keyd/releases/latest"
 CLEANUP=""
 
@@ -32,8 +33,47 @@ fetch() {
   fi
 }
 
+http_stdout() {
+  local url="$1"
+  if need_cmd curl; then
+    curl -fsSL -H 'User-Agent: period-space' "$url"
+  elif need_cmd wget; then
+    wget -qO- --user-agent='period-space' "$url"
+  else
+    return 1
+  fi
+}
+
 json_field() {
   python3 -c 'import json,sys; print(json.load(sys.stdin)[sys.argv[1]])' "$1"
+}
+
+latest_period_space_tag() {
+  http_stdout "$PERIOD_SPACE_RELEASES" \
+    | json_field tag_name 2>/dev/null || true
+}
+
+verify_release_file() {
+  local sums="$1" name="$2" path="$3"
+  python3 - "$sums" "$name" "$path" <<'PY'
+import hashlib
+import hmac
+import pathlib
+import sys
+
+sums_path, name, file_path = sys.argv[1:]
+expected = None
+for line in pathlib.Path(sums_path).read_text().splitlines():
+    parts = line.split(maxsplit=1)
+    if len(parts) == 2 and parts[1].lstrip("*") == name:
+        expected = parts[0]
+        break
+if expected is None:
+    raise SystemExit(f"release checksum is missing for {name}")
+actual = hashlib.sha256(pathlib.Path(file_path).read_bytes()).hexdigest()
+if not hmac.compare_digest(actual, expected):
+    raise SystemExit(f"release checksum failed for {name}")
+PY
 }
 
 resolve_root() {
@@ -123,8 +163,7 @@ install_build_deps() {
 
 latest_keyd_tag() {
   local tag=""
-  tag="$(curl -fsSL -H 'User-Agent: period-space' "$KEYD_RELEASES" \
-    | json_field tag_name 2>/dev/null || true)"
+  tag="$(http_stdout "$KEYD_RELEASES" | json_field tag_name 2>/dev/null || true)"
   if [[ -z "$tag" ]]; then
     tag="v2.5.0"
   fi
@@ -254,21 +293,39 @@ main() {
   prompt_sudo
   ensure_python3
 
-  local root raw="$RAW"
+  local root
   root="$(resolve_root)"
   if [[ -z "$root" ]]; then
     root="$(mktemp -d)"
     CLEANUP="$root"
-    local sha=""
-    sha="$(curl -fsSL -H 'User-Agent: period-space' \
-      https://api.github.com/repos/hapwi/period-space/commits/main \
-      | json_field sha 2>/dev/null || true)"
-    if [[ -n "$sha" && -z "${PERIOD_SPACE_RAW:-}" ]]; then
-      raw="https://raw.githubusercontent.com/hapwi/period-space/${sha}"
+    if [[ -n "${PERIOD_SPACE_RAW:-}" ]]; then
+      echo "downloading development build"
+      fetch "${PERIOD_SPACE_RAW%/}/period-space" "$root/period-space"
+      fetch "${PERIOD_SPACE_RAW%/}/keyd.conf" "$root/keyd.conf"
+    else
+      local tag=""
+      tag="$(latest_period_space_tag)"
+      if [[ -n "$tag" ]]; then
+        local release="https://github.com/hapwi/period-space/releases/download/${tag}"
+        echo "downloading period-space ${tag#v}"
+        fetch "$release/period-space" "$root/period-space"
+        fetch "$release/keyd.conf" "$root/keyd.conf"
+        fetch "$release/SHA256SUMS" "$root/SHA256SUMS"
+        verify_release_file "$root/SHA256SUMS" "period-space" "$root/period-space"
+        verify_release_file "$root/SHA256SUMS" "keyd.conf" "$root/keyd.conf"
+      else
+        echo "no release found; installing the current main branch"
+        local sha="" raw="$MAIN_RAW"
+        sha="$(http_stdout \
+          https://api.github.com/repos/hapwi/period-space/commits/main \
+          | json_field sha 2>/dev/null || true)"
+        if [[ -n "$sha" ]]; then
+          raw="https://raw.githubusercontent.com/hapwi/period-space/${sha}"
+        fi
+        fetch "$raw/period-space" "$root/period-space"
+        fetch "$raw/keyd.conf" "$root/keyd.conf"
+      fi
     fi
-    echo "downloading from GitHub"
-    fetch "$raw/period-space" "$root/period-space"
-    fetch "$raw/keyd.conf" "$root/keyd.conf"
     chmod +x "$root/period-space"
   fi
 
