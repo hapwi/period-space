@@ -186,6 +186,10 @@ sudo rm -rf /usr/local/share/period-space
 
 keyd stays installed in case you use it for other remappings.
 
+## Contributing
+
+Bug reports and suggestions are welcome. Pull requests are currently limited to trusted contributors; see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
 ## License
 
 Released under the [MIT License](LICENSE).
