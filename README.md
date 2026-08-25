@@ -1,9 +1,9 @@
+# period-space
+
 <div align="center">
-  <h1>period-space</h1>
+  <p><strong>Double-space to period, everywhere on Linux.</strong></p>
 
-  <p><strong>Double-space. Full stop.</strong></p>
-
-  <p>The familiar mobile typing shortcut, system-wide on Linux.</p>
+  <p>Tap Space twice after a word. Get a period. Keep typing.</p>
 
   <p>
     <code>hello world</code>
@@ -14,23 +14,12 @@
   </p>
 
   <p>
-    <a href="#quick-install"><strong>Install</strong></a>
-    &nbsp;·&nbsp;
-    <a href="#why-period-space">Why period-space?</a>
-    &nbsp;·&nbsp;
-    <a href="#command-line">Commands</a>
-    &nbsp;·&nbsp;
-    <a href="#configuration">Configure</a>
-  </p>
-
-  <p>
-    <sub>Linux &nbsp;·&nbsp; Wayland + X11 + TTY &nbsp;·&nbsp; MIT &nbsp;·&nbsp; powered by <a href="https://github.com/rvaiya/keyd">keyd</a></sub>
+    <a href="https://github.com/hapwi/period-space/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/hapwi/period-space?style=flat-square&logo=github"></a>
+    <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-2ea44f?style=flat-square"></a>
+    <img alt="Linux" src="https://img.shields.io/badge/platform-Linux-blue?style=flat-square&logo=linux&logoColor=white">
+    <a href="https://github.com/rvaiya/keyd"><img alt="Powered by keyd" src="https://img.shields.io/badge/powered_by-keyd-555?style=flat-square"></a>
   </p>
 </div>
-
----
-
-## One tiny habit, everywhere you type
 
 **period-space** brings the familiar iOS and macOS double-space shortcut to Linux. It remaps your keyboard at the device level with [keyd](https://github.com/rvaiya/keyd), so the shortcut works across your entire system—not just inside one app.
 
@@ -42,7 +31,7 @@ Terminal, editor, browser, desktop, or raw TTY: if you can type there, period-sp
 - **Lightweight** — a small controller and one focused keyd configuration
 - **Yours to tune** — adjust the timing with a single config value
 
-## Quick install
+## Install
 
 One command. No clone required.
 
