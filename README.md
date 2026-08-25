@@ -1,53 +1,34 @@
 <div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
-    <img src="assets/logo-light.svg" alt="period-space" width="390">
-  </picture>
+  <h1>period-space</h1>
 
-  <br>
-  <br>
+  <p><strong>Double-space. Full stop.</strong></p>
 
-  <strong>The double-space shortcut Linux has been missing.</strong>
+  <p>The familiar mobile typing shortcut, system-wide on Linux.</p>
 
-  <br>
-  <br>
+  <p>
+    <code>hello world</code>
+    +
+    <kbd>Space</kbd> <kbd>Space</kbd>
+    &nbsp;→&nbsp;
+    <code>hello world.</code>
+  </p>
 
-  Tap <kbd>Space</kbd> twice after a word. Get a period. Keep typing.
+  <p>
+    <a href="#quick-install"><strong>Install</strong></a>
+    &nbsp;·&nbsp;
+    <a href="#why-period-space">Why period-space?</a>
+    &nbsp;·&nbsp;
+    <a href="#command-line">Commands</a>
+    &nbsp;·&nbsp;
+    <a href="#configuration">Configure</a>
+  </p>
 
-  <br>
-  <br>
-
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/keys-dark.svg">
-    <img src="assets/keys-light.svg" alt="Two spaces become a period and a space" width="500">
-  </picture>
-
-  <br>
-  <br>
-
-  <a href="#quick-install">Quick install</a>
-  <span>&nbsp;·&nbsp;</span>
-  <a href="#why-period-space">Why period-space?</a>
-  <span>&nbsp;·&nbsp;</span>
-  <a href="#command-line">Commands</a>
-  <span>&nbsp;·&nbsp;</span>
-  <a href="#configuration">Configure</a>
-
-  <br>
-  <br>
-
-  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-111111?style=flat-square"></a>
-  <img alt="Linux" src="https://img.shields.io/badge/platform-Linux-111111?style=flat-square&logo=linux&logoColor=white">
-  <img alt="Wayland, X11, and TTY support" src="https://img.shields.io/badge/support-Wayland%20·%20X11%20·%20TTY-111111?style=flat-square">
-  <a href="https://github.com/rvaiya/keyd"><img alt="Powered by keyd" src="https://img.shields.io/badge/powered%20by-keyd-111111?style=flat-square"></a>
+  <p>
+    <sub>Linux &nbsp;·&nbsp; Wayland + X11 + TTY &nbsp;·&nbsp; MIT &nbsp;·&nbsp; powered by <a href="https://github.com/rvaiya/keyd">keyd</a></sub>
+  </p>
 </div>
 
-<br>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/demo-dark.svg">
-  <img src="assets/demo-light.svg" alt="period-space working in Ghostty, vim, and Firefox">
-</picture>
+---
 
 ## One tiny habit, everywhere you type
 
@@ -112,13 +93,7 @@ App-specific plugins only work where you install them. Desktop extensions stop a
 
 period-space sits below all of them.
 
-The keyboard event is transformed before it reaches your compositor or application, giving you one predictable shortcut everywhere:
-
-```text
-Write the sentence␠␠
-                  ↓
-Write the sentence.␠
-```
+The keyboard event is transformed before it reaches your compositor or application. Type `Write the sentence`, tap Space twice, and every app receives `Write the sentence. `.
 
 ## Command line
 
