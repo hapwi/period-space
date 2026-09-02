@@ -28,7 +28,8 @@ Terminal, editor, browser, desktop, or raw TTY: if you can type there, period-sp
 - **System-wide** — one setup for every app
 - **Desktop-agnostic** — works on Wayland, X11, GNOME, KDE, niri, and more
 - **Shortcut-safe** — Ctrl, Alt, Super, and AltGr + Space keep their normal behavior
-- **Lightweight** — a small controller and one focused keyd configuration
+- **Plays well with keyd** — rides inside your existing keyd configs instead of fighting them for the keyboard
+- **Self-healing** — a small guard re-attaches the mapping if another config appears, and keyd restarts itself if it crashes
 - **Yours to tune** — adjust the timing with a single config value
 
 ## Install
@@ -88,10 +89,11 @@ The keyboard event is transformed before it reaches your compositor or applicati
 
 | Command | Purpose |
 | :--- | :--- |
-| `period-space on` | Enable the mapping and start keyd |
-| `period-space off` | Remove the mapping while keeping keyd installed |
-| `period-space status` | Show the config, service, and feature status |
-| `period-space reload` | Apply changes from your user config |
+| `period-space on` | Enable the mapping, install the guard, and start keyd |
+| `period-space off` | Remove the mapping and the guard while keeping keyd installed |
+| `period-space status` | Show the config, service, every keyd config, and which config owns each keyboard |
+| `period-space reload` | Apply changes from your user config and restart keyd |
+| `period-space ensure` | Re-attach the mapping to every keyd config that owns a keyboard (what the guard runs) |
 | `period-space update` | Check for a newer release and ask before installing it |
 | `period-space --version` | Print the installed version |
 
@@ -159,9 +161,23 @@ Then add it to your config:
 -1532:007d
 ```
 
-Apply the change with `period-space reload`.
+Apply the change with `period-space reload`. The `[ids]` section only takes effect while period-space owns `/etc/keyd/period-space.conf`; if another keyd config already claims all keyboards, put the exclusion in that file instead.
 
 </details>
+
+## Alongside other keyd configs
+
+keyd binds each keyboard to exactly one `/etc/keyd/*.conf`. If two files both say `[ids] *`, the winner is whichever one the filesystem happens to list first, and the loser's bindings silently vanish. period-space is built around that rule instead of hoping you never hit it:
+
+- The bindings live in `/etc/keyd/period-space.inc`. It is not a `.conf`, so keyd never loads it on its own.
+- Every config that claims a keyboard gets two clearly marked lines appended: a comment and `include period-space.inc`. Your own bindings in that file stay exactly as they were.
+- `/etc/keyd/period-space.conf` (`[ids] *`) is created only when no other config already matches all keyboards. If you later add your own wildcard config, period-space removes its file and moves into yours.
+- A systemd path unit, `period-space-guard.path`, watches `/etc/keyd`. Add or edit a config and `period-space ensure` runs, re-attaches the include where it is missing, and restarts keyd only if something changed.
+- A drop-in gives `keyd.service` `Restart=on-failure`, so a keyd crash does not quietly take double-space with it.
+
+Every file is validated with `keyd check` before keyd is restarted; if anything fails, all edits are rolled back. Configs keyd already rejects are left untouched.
+
+`period-space status` lists every keyd config, whether it includes period-space, and which config keyd bound each connected keyboard to.
 
 ## How it works
 
@@ -176,6 +192,9 @@ Because the transformation happens at the input-device level, every desktop, com
 > [!TIP]
 > If your keyboard ever becomes unresponsive, hold **Backspace + Escape + Enter** to stop keyd.
 
+> [!NOTE]
+> period-space restarts keyd (`systemctl restart keyd`) rather than using `keyd reload`. Reload re-parses configs inside the running daemon and has crashed on us; a restart is a clean start every time.
+
 ## Uninstall
 
 ```bash
@@ -184,7 +203,7 @@ sudo rm -f /usr/local/bin/period-space
 sudo rm -rf /usr/local/share/period-space
 ```
 
-keyd stays installed in case you use it for other remappings.
+`period-space off` removes the include lines from your keyd configs, the `.inc` file, the guard units, and the keyd restart drop-in. keyd itself stays installed in case you use it for other remappings.
 
 ## Contributing
 
